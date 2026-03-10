@@ -27,46 +27,46 @@ update_files :: proc(paths: []string, opt: enum { add, remove }) {
 
 		//	only search lines up until index of "package"
 		package_idx := bytes.index(data, to_bytes("package"))
-		lines := bytes.split(data[:package_idx], {'\n'}, context.allocator)
-		defer delete(lines, context.allocator)
-
-		//	search lines for instance of "#+vet explicit-allocators"
-		//	idx == 0 means it was found to be at the beginning of a line (i.e. not commented out)
-		vet := to_bytes("#+vet explicit-allocators\n")
-		for line in lines {
-			//	newline was used to split lines, so must check for bytes without newline
-			//	we only care if the line begins with our target anyway
-			if idx := bytes.index(line, to_bytes("#+vet explicit-allocators")); idx == 0 {
-				//	if found and flagged to remove
-				if opt == .remove {
-					//	only remove n times, to prevent parsing entire file
-					n := bytes.count(data, vet)
-					newdata, removed := bytes.remove(data, vet, n, context.allocator)
-					if removed {
-						defer delete(newdata, context.allocator)
-						assert(len(newdata) == len(data) - (len(vet) * n))
-						write_err := os.write_entire_file_from_bytes(path, newdata[:])
-						if write_err != nil {
-							fmt.eprintln(os.error_string(write_err))
-						} else {
-							fmt.println("Updated:", path)
+		if package_idx >= 0 {
+			lines := bytes.split(data[:package_idx], {'\n'}, context.allocator)
+			defer delete(lines, context.allocator)
+			//	search lines for instance of "#+vet explicit-allocators"
+			vet := to_bytes("#+vet explicit-allocators\n")
+			for line in lines {
+				//	newline was used to split lines, so must check for bytes without newline
+				//	idx == 0 means it was found to be at the beginning of a line (i.e. not commented out)
+				if idx := bytes.index(line, to_bytes("#+vet explicit-allocators")); idx == 0 {
+					//	if found and flagged to remove
+					if opt == .remove {
+						//	only remove n times, to prevent parsing entire file
+						n := bytes.count(data, vet)
+						newdata, removed := bytes.remove(data, vet, n, context.allocator)
+						if removed {
+							defer delete(newdata, context.allocator)
+							assert(len(newdata) == len(data) - (len(vet) * n))
+							write_err := os.write_entire_file_from_bytes(path, newdata[:])
+							if write_err != nil {
+								fmt.eprintln(os.error_string(write_err))
+							} else {
+								fmt.println("Updated:", path)
+							}
 						}
 					}
+					continue loop // continue loop if found: stop checking lines, skip add below, and check next path
 				}
-				continue loop // continue loop if found: stop checking lines, skip add below, and check next path
 			}
-		}
-		//	if not found and flagged to add
-		if opt == .add {
-			newdata, newdata_err := bytes.concatenate_safe({vet, data}, context.allocator)
-			defer delete(newdata, context.allocator)
-			if len(data) != 0 && data_err == nil && newdata_err == nil {
-				assert(len(newdata) == len(data) + len(vet))
-				write_err := os.write_entire_file_from_bytes(path, newdata[:])
-				if write_err != nil {
-					fmt.eprintln(os.error_string(write_err))
-				} else {
-					fmt.println("Updated:", path)
+			//	if not found and flagged to add
+			if opt == .add {
+				newdata, newdata_err := bytes.concatenate_safe({vet, data}, context.allocator)
+				defer delete(newdata, context.allocator)
+				if len(data) != 0 && data_err == nil && newdata_err == nil {
+					assert(len(newdata) == len(data) + len(vet))
+					write_err := os.write_entire_file_from_bytes(path, newdata[:])
+					if write_err != nil {
+						fmt.eprintln(os.error_string(write_err))
+					} else {
+						fmt.println("Updated:", path)
+					}
 				}
 			}
 		}
