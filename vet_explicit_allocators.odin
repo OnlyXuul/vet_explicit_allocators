@@ -26,9 +26,8 @@ update_files :: proc(paths: []string, opt: enum { add, remove }) {
 		defer delete(data, context.allocator)
 
 		//	only search lines up until index of "package"
-		package_idx := bytes.index(data, to_bytes("package"))
-		if package_idx >= 0 {
-			lines := bytes.split(data[:package_idx], {'\n'}, context.allocator)
+		if pkg_idx := bytes.index(data, to_bytes("package")); pkg_idx >= 0 {
+			lines := bytes.split(data[:pkg_idx], {'\n'}, context.allocator)
 			defer delete(lines, context.allocator)
 			//	search lines for instance of "#+vet explicit-allocators"
 			vet := to_bytes("#+vet explicit-allocators\n")
@@ -40,13 +39,11 @@ update_files :: proc(paths: []string, opt: enum { add, remove }) {
 					if opt == .remove {
 						//	only remove n times, to prevent parsing entire file
 						n := bytes.count(data, vet)
-						newdata, removed := bytes.remove(data, vet, n, context.allocator)
-						if removed {
+						if newdata, removed := bytes.remove(data, vet, n, context.allocator); removed {
 							defer delete(newdata, context.allocator)
 							assert(len(newdata) == len(data) - (len(vet) * n))
-							write_err := os.write_entire_file_from_bytes(path, newdata[:])
-							if write_err != nil {
-								fmt.eprintln(os.error_string(write_err))
+							if err := os.write_entire_file_from_bytes(path, newdata[:]); err != nil {
+								fmt.eprintln(os.error_string(err))
 							} else {
 								fmt.println("Updated:", path)
 							}
@@ -61,9 +58,8 @@ update_files :: proc(paths: []string, opt: enum { add, remove }) {
 				defer delete(newdata, context.allocator)
 				if len(data) != 0 && data_err == nil && newdata_err == nil {
 					assert(len(newdata) == len(data) + len(vet))
-					write_err := os.write_entire_file_from_bytes(path, newdata[:])
-					if write_err != nil {
-						fmt.eprintln(os.error_string(write_err))
+					if err := os.write_entire_file_from_bytes(path, newdata[:]); err != nil {
+						fmt.eprintln(os.error_string(err))
 					} else {
 						fmt.println("Updated:", path)
 					}
